@@ -7,18 +7,20 @@ describe 'Build' do
 
     before { build.run }
 
-    it { build.trace.should include 'bundle' }
-    it { build.trace.should include 'HEAD is now at 2e008a7' }
+    it { build.trace.should include 'php -v' }
+    it { build.trace.should include 'HEAD is now at dd889e3' }
+    it { build.trace.should include 'sudo apt-get install poppler-utils'}
     it { build.state.should == :success }
   end
 
   def build_data
     {
-      commands: ['bundle'],
+      commands: ['php -v'],
       project_id: 0,
       id: 9312,
-      ref: '2e008a711430a16092cd6a20c225807cb3f51db7',
-      repo_url: 'https://github.com/randx/six.git'
+      ref: 'dd889e3494c1ca74be571481bf4aacfe0202034a',
+      repo_url: 'https://github.com/mgufrone/pdf-to-html'
     }
   end
 end
+

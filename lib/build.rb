@@ -1,6 +1,5 @@
 require_relative 'encode'
 require_relative 'config'
-
 require 'childprocess'
 require 'tempfile'
 require 'fileutils'
@@ -23,6 +22,7 @@ module GitlabCi
       @before_sha = data[:before_sha]
       @timeout = data[:timeout] || TIMEOUT
       @allow_git_fetch = data[:allow_git_fetch]
+      @language_type = ''
     end
 
     def run
@@ -38,12 +38,18 @@ module GitlabCi
         @commands.unshift(clone_cmd)
       end
 
+      
+      run_cmd
+      @commands = script_cmd
+      run_cmd      
+
+      @state = :success
+    end
+    def run_cmd
       @commands.each do |line|
         status = Bundler.with_clean_env { command line }
         @state = :failed and return unless status
       end
-
-      @state = :success
     end
 
     def completed?
@@ -154,6 +160,39 @@ module GitlabCi
       cmd << "git remote set-url origin #{@repo_url}"
       cmd << "git fetch origin"
       cmd.join(" && ")
+    end
+
+    def script_cmd
+      script_file = "#{project_dir}/.travis.yml"
+      commands = []
+      if File.exists?(script_file) 
+        scripts = YAML.load_file(script_file)
+        @language_type = scripts['language'] if scripts.include?('language')
+        @language_type = 'php' unless scripts.include?('language')
+        if scripts.include?('before_script')
+          scripts['before_script'].each {|cmd| commands.push(cmd)}
+        end
+        if scripts.include?('script')
+          scripts['script'].each {|cmd| commands.push(cmd)} if scripts['script'].kind_of?(Array)
+          commands.push(scripts['script']) unless scripts['script'].kind_of?(Array)
+        else
+          case @language_type
+            when 'ruby'
+              commands.push('bundle')
+            when 'php'
+              composer_file = "#{project_dir}/composer.json"
+              commands.push('composer install -vvv') if File.exists?(composer_file)
+              commands.push('phpunit')
+            else
+              commands.push('phpunit')
+            end
+          end
+        end
+
+
+        # puts scripts
+      end
+      commands
     end
 
     def repo_exists?
