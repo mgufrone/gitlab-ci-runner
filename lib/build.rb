@@ -163,34 +163,45 @@ module GitlabCi
     end
 
     def script_cmd
-      script_file = "#{project_dir}/.travis.yml"
+      script_file = "#{project_dir}/.script.yml"
+      script_file = "#{project_dir}/.travis.yml" unless File.exists?(script_file)
       commands = []
+
       if File.exists?(script_file) 
+
         scripts = YAML.load_file(script_file)
         @language_type = scripts['language'] if scripts.include?('language')
         @language_type = 'php' unless scripts.include?('language')
+
         if scripts.include?('before_script')
-          scripts['before_script'].each {|cmd| commands.push(cmd)}
+          scripts['before_script'].each {|cmd| commands.push(cmd)} if scripts['before_script'].kind_of?(Array)
+          commands.push(scripts['before_script']) unless scripts['before_script'].kind_of?(Array)
+
         end
+
         if scripts.include?('script')
           scripts['script'].each {|cmd| commands.push(cmd)} if scripts['script'].kind_of?(Array)
           commands.push(scripts['script']) unless scripts['script'].kind_of?(Array)
+
         else
+          
           case @language_type
+
             when 'ruby'
               commands.push('bundle')
+
             when 'php'
               composer_file = "#{project_dir}/composer.json"
               commands.push('composer install -vvv') if File.exists?(composer_file)
               commands.push('phpunit')
+
             else
               commands.push('phpunit')
-            end
+
           end
+
         end
 
-
-        # puts scripts
       end
       commands
     end
