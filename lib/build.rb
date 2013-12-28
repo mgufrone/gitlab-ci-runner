@@ -162,6 +162,34 @@ module GitlabCi
       cmd.join(" && ")
     end
 
+    def ftp_cmd (config)
+      cmd = []
+      project_name = "project-#{@project_id}"
+      if config.include?('username')
+        config.each do |key, value|
+          if key == 'url' 
+            value = "ftp://#{value}"
+          end
+          cmd << "git config git-ftp.#{key} #{value}"
+        end
+        cmd << "git config git-ftp.deployedsha1file #{Digest::MD5.hexdigest(project_name).to_s}"
+      else
+        config.each do |stage, value|
+          value.each do |key, val| 
+            if key == 'url' 
+              val = "ftp://#{val}"
+            end
+            cmd << "git config git-ftp.#{stage}.#{key} #{val}"
+          end
+          cmd << "git config git-ftp.#{stage}.deployedsha1file #{Digest::MD5.hexdigest(project_name)}"
+          cmd << "git ftp push -s #{stage}" if system 'git ftp log -s #{stage}' 
+          cmd << "git ftp init -s #{stage}" unless system 'git ftp log -s #{stage}' 
+        end
+      end
+
+      cmd.join(" && ")
+    end
+
     def script_cmd
       script_file = "#{project_dir}/.script.yml"
       script_file = "#{project_dir}/.travis.yml" unless File.exists?(script_file)
@@ -191,8 +219,7 @@ module GitlabCi
               commands.push('bundle')
 
             when 'php'
-              composer_file = "#{project_dir}/composer.json"
-              commands.push('composer install -vvv') if File.exists?(composer_file)
+              commands.push('composer install -vvv') if File.exists?("#{project_dir}/composer.json")
               commands.push('phpunit')
 
             else
@@ -202,7 +229,10 @@ module GitlabCi
 
         end
 
+        commands.push(ftp_cmd scripts['ftp']) if scripts.include?('ftp')
+        # puts commands if scripts.include?('ftp')
       end
+      
       commands
     end
 
