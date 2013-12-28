@@ -23,6 +23,10 @@ module GitlabCi
       @timeout = data[:timeout] || TIMEOUT
       @allow_git_fetch = data[:allow_git_fetch]
       @language_type = ''
+      config_file = File.dirname(File.expand_path(__FILE__)) + '/../config/config.yml'
+      config = YAML.load_file() if File.exists?(config_file)
+      @machine_type = 'staging' if config == nil
+      @machine_type = config['machine_for'] unless config == nil
     end
 
     def run
@@ -162,29 +166,20 @@ module GitlabCi
       cmd.join(" && ")
     end
 
-    def ftp_cmd (config)
+    def ftp_cmd (ftp_config)
       cmd = []
+      config = ftp_config[@machine_type]
       project_name = "project-#{@project_id}"
       if config.include?('username')
         config.each do |key, value|
           if key == 'url' 
             value = "ftp://#{value}"
           end
-          cmd << "git config git-ftp.#{key} #{value}"
+          cmd << "git config git-ftp.#{@machine_type}.#{key} #{value}"
         end
-        cmd << "git config git-ftp.deployedsha1file #{Digest::MD5.hexdigest(project_name).to_s}"
-      else
-        config.each do |stage, value|
-          value.each do |key, val| 
-            if key == 'url' 
-              val = "ftp://#{val}"
-            end
-            cmd << "git config git-ftp.#{stage}.#{key} #{val}"
-          end
-          cmd << "git config git-ftp.#{stage}.deployedsha1file #{Digest::MD5.hexdigest(project_name)}"
-          cmd << "git ftp push -s #{stage}" if system 'git ftp log -s #{stage}' 
-          cmd << "git ftp init -s #{stage}" unless system 'git ftp log -s #{stage}' 
-        end
+        cmd << "git config git-ftp.#{@machine_type}.deployedsha1file #{Digest::MD5.hexdigest(project_name).to_s}"
+        cmd << "git ftp push -s #{@machine_type}" if system 'git ftp log -s #{@machine_type}' 
+        cmd << "git ftp init -s #{@machine_type}" unless system 'git ftp log -s #{@machine_type}' 
       end
 
       cmd.join(" && ")
